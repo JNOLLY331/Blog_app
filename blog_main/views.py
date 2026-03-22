@@ -1,43 +1,44 @@
-
 from django.shortcuts import redirect, render
-
 from blogs.models import Blog, Category
 from assignments.models import About
 from .forms import RegistrationForm
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import auth
+from django.core.exceptions import ObjectDoesNotExist
+
 
 def home(request):
-    featured_posts = Blog.objects.filter(is_featured=True, status='Published').order_by('updated_at')
-    posts = Blog.objects.filter(is_featured=False, status='Published')
-    
-    # Fetch about us
+    featured_posts = Blog.objects.filter(
+        is_featured=True, status='Published'
+    ).order_by('-updated_at')
+
+    posts = Blog.objects.filter(
+        is_featured=False, status='Published'
+    )
+
     try:
         about = About.objects.get()
-    except:
+    except ObjectDoesNotExist:
         about = None
-    context = {
+
+    return render(request, 'home.html', {
         'featured_posts': featured_posts,
         'posts': posts,
         'about': about,
-    }
-    return render(request, 'home.html', context)
+    })
 
 
 def register(request):
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('register')
-        else:
-            print(form.errors)
+            user = form.save()
+            auth.login(request, user)  # auto login
+            return redirect('login')
     else:
         form = RegistrationForm()
-    context = {
-        'form': form,
-    }
-    return render(request, 'register.html', context)
+
+    return render(request, 'register.html', {'form': form})
 
 
 def login(request):
@@ -50,12 +51,11 @@ def login(request):
             user = auth.authenticate(username=username, password=password)
             if user is not None:
                 auth.login(request, user)
-            return redirect('dashboard')
-    form = AuthenticationForm()
-    context = {
-        'form': form,
-    }
-    return render(request, 'login.html', context)
+                return redirect('dashboard')
+    else:
+        form = AuthenticationForm()
+
+    return render(request, 'login.html', {'form': form})
 
 
 def logout(request):
